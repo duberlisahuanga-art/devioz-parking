@@ -1,66 +1,242 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
-import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
-import NavMain from '@/components/NavMain.vue';
-import NavUser from '@/components/NavUser.vue';
+import { usePage } from '@inertiajs/vue3';
+import {
+    LayoutDashboard,
+    Calendar,
+    ParkingCircle,
+    Camera,
+    CreditCard,
+    Wrench,
+    Users,
+    ClipboardList,
+    Car,
+    Settings,
+    HelpCircle,
+} from '@lucide/vue';
+import { computed } from 'vue';
+
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+import NavMain from './NavMain.vue';
+import NavFooter from './NavFooter.vue';
+import NavUser from './NavUser.vue';
+
+interface NavItem {
+    title: string;
+    href: string;
+    icon?: any;
+    isActive?: boolean;
+
+    items?: {
+        title: string;
+        href: string;
+    }[];
+}
+
+interface Role {
+    id?: number;
+    name: string;
+}
+
+interface AuthUser {
+    id: number;
+    name: string;
+    email: string;
+    roles?: Role[];
+}
+
+const page = usePage();
+
+const user = computed(
+    () => page.props.auth?.user as AuthUser | null,
+);
+
+const role = computed(() => {
+    return user.value?.roles?.[0]?.name ?? 'driver';
+});
+
+const isAdmin = computed(
+    () => role.value === 'admin',
+);
+
+/*
+|--------------------------------------------------------------------------
+| Menú del administrador
+|--------------------------------------------------------------------------
+*/
+
+const adminNavItems: NavItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
+        href: '/dashboard',
+        icon: LayoutDashboard,
+        isActive: true,
+    },
+    {
+        title: 'Reservas',
+        href: '/reservations',
+        icon: Calendar,
+        items: [
+            {
+                title: 'Nueva Reserva',
+                href: '/reservations/create',
+            },
+            {
+                title: 'Historial',
+                href: '/reservations',
+            },
+        ],
+    },
+    {
+        title: 'Espacios',
+        href: '/admin/spaces',
+        icon: ParkingCircle,
+    },
+    {
+        title: 'Cámaras',
+        href: '/admin/cameras',
+        icon: Camera,
+    },
+    {
+        title: 'Pagos',
+        href: '/admin/payments',
+        icon: CreditCard,
+    },
+    {
+        title: 'Servicios',
+        href: '/admin/services',
+        icon: Wrench,
+    },
+    {
+        title: 'Usuarios',
+        href: '/admin/users',
+        icon: Users,
+    },
+    {
+        title: 'Auditoría',
+        href: '/admin/audit',
+        icon: ClipboardList,
     },
 ];
 
-const footerNavItems: NavItem[] = [
+/*
+|--------------------------------------------------------------------------
+| Menú del conductor
+|--------------------------------------------------------------------------
+*/
+
+const driverNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
+        title: 'Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard,
+        isActive: true,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
+        title: 'Reservas',
+        href: '/reservations',
+        icon: Calendar,
+        items: [
+            {
+                title: 'Nueva Reserva',
+                href: '/reservations/create',
+            },
+            {
+                title: 'Mis Reservas',
+                href: '/reservations',
+            },
+        ],
+    },
+    {
+        title: 'Mis Vehículos',
+        href: '/vehicles',
+        icon: Car,
+    },
+];
+
+/*
+|--------------------------------------------------------------------------
+| Menú visible según rol
+|--------------------------------------------------------------------------
+*/
+
+const mainNavItems = computed<NavItem[]>(() => {
+    return isAdmin.value
+        ? adminNavItems
+        : driverNavItems;
+});
+
+/*
+|--------------------------------------------------------------------------
+| Pie del menú
+|--------------------------------------------------------------------------
+*/
+
+const footerNavItems: NavItem[] = [
+    {
+        title: 'Configuración',
+        href: '/settings',
+        icon: Settings,
+    },
+    {
+        title: 'Ayuda',
+        href: '/help',
+        icon: HelpCircle,
     },
 ];
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-                            <AppLogo />
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+    <Sidebar
+        collapsible="icon"
+        class="border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300"
+    >
+        <!-- LOGO -->
+        <SidebarHeader
+            class="border-b border-sidebar-border px-3 py-4"
+        >
+            <div
+                class="flex items-center overflow-hidden"
+            >
+                <!-- Logo completo -->
+                <img
+                    src="/logo-devioz.png"
+                    alt="DEVIOZ"
+                    class="h-10 w-auto max-w-[160px] object-contain object-left transition-all duration-300 group-data-[collapsible=icon]:hidden"
+                />
+
+                <!-- Logo compacto -->
+                <img
+                    src="/favicon.png"
+                    alt="DEVIOZ"
+                    class="hidden size-8 shrink-0 object-contain group-data-[collapsible=icon]:block"
+                />
+            </div>
         </SidebarHeader>
 
-        <SidebarContent>
-            <NavMain :items="mainNavItems" />
+        <!-- MENÚ PRINCIPAL -->
+        <SidebarContent class="py-4">
+            <NavMain
+                :items="mainNavItems"
+            />
         </SidebarContent>
 
-        <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+        <!-- PIE -->
+        <SidebarFooter
+            class="border-t border-sidebar-border p-3"
+        >
+            <NavFooter
+                :items="footerNavItems"
+            />
+
             <NavUser />
         </SidebarFooter>
+
+        <slot />
     </Sidebar>
-    <slot />
 </template>

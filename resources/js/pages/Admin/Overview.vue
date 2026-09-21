@@ -1,0 +1,13 @@
+<script setup lang="ts">
+import { Head } from '@inertiajs/vue3';
+interface Metrics { total_spaces: number; parkings: number; availability: number; active_reservations: number; }
+interface Parking { id: number; name: string; address: string; capacity: number; spaces_count: number; occupied_spaces_count: number; }
+interface User { id: number; name: string; email: string; roles: { name: string }[]; }
+defineProps<{ metrics: Metrics; parkings: Parking[]; users: User[] }>();
+</script>
+<template>
+    <Head title="Vista global" /><div class="flex flex-1 flex-col gap-6 p-6"><div><p class="text-sm text-muted-foreground">Administrador</p><h1 class="text-2xl font-semibold">Vista global</h1></div>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><div class="rounded-xl border bg-card p-5"><p class="text-sm text-muted-foreground">Espacios</p><p class="mt-2 text-3xl font-semibold">{{ metrics.total_spaces }}</p></div><div class="rounded-xl border bg-card p-5"><p class="text-sm text-muted-foreground">Parkings</p><p class="mt-2 text-3xl font-semibold">{{ metrics.parkings }}</p></div><div class="rounded-xl border bg-card p-5"><p class="text-sm text-muted-foreground">Disponibilidad</p><p class="mt-2 text-3xl font-semibold">{{ metrics.availability.toFixed(1) }}%</p></div><div class="rounded-xl border bg-card p-5"><p class="text-sm text-muted-foreground">Reservas activas</p><p class="mt-2 text-3xl font-semibold">{{ metrics.active_reservations }}</p></div></div>
+    <div class="grid gap-6 xl:grid-cols-2"><section class="overflow-hidden rounded-xl border bg-card"><h2 class="border-b p-5 text-lg font-semibold">Parkings</h2><table class="w-full text-left text-sm"><thead class="border-b bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Nombre</th><th class="p-4">Dirección</th><th class="p-4">Ocupación</th></tr></thead><tbody class="divide-y"><tr v-for="parking in parkings" :key="parking.id"><td class="p-4 font-medium">{{ parking.name }}</td><td class="p-4">{{ parking.address }}</td><td class="p-4">{{ parking.spaces_count ? ((parking.occupied_spaces_count / parking.spaces_count) * 100).toFixed(1) : 0 }}%</td></tr></tbody></table></section><section class="overflow-hidden rounded-xl border bg-card"><h2 class="border-b p-5 text-lg font-semibold">Usuarios</h2><table class="w-full text-left text-sm"><thead class="border-b bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Nombre</th><th class="p-4">Email</th><th class="p-4">Rol</th></tr></thead><tbody class="divide-y"><tr v-for="user in users" :key="user.id"><td class="p-4 font-medium">{{ user.name }}</td><td class="p-4">{{ user.email }}</td><td class="p-4">{{ user.roles[0]?.name ?? 'driver' }}</td></tr></tbody></table></section></div>
+    </div>
+</template>

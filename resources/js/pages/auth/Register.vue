@@ -62,6 +62,12 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
+                <Label for="phone">Teléfono</Label>
+                <Input id="phone" type="tel" required name="phone" placeholder="999 999 999" />
+                <InputError :message="errors.phone" />
+            </div>
+
+            <div class="grid gap-2">
                 <Label for="password">Password</Label>
                 <PasswordInput
                     id="password"
@@ -88,6 +94,12 @@ defineOptions({
                 />
                 <InputError :message="errors.password_confirmation" />
             </div>
+
+            <label class="flex items-start gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" name="terms_accepted" value="1" required class="mt-1 rounded border-slate-300" />
+                <span>Acepto los términos y la política de privacidad. Mis placas serán tratadas según la Ley 29733 de Protección de Datos Personales.</span>
+            </label>
+            <InputError :message="errors.terms_accepted" />
 
             <Button
                 type="submit"

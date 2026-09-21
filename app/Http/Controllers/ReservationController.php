@@ -1,0 +1,513 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Reservation;
+use App\Models\Service;
+use App\Models\Space;
+use App\Services\AuditService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class ReservationController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        return Inertia::render('Reservations/Index', [
+            'reservations' => $request->user()
+                ->reservations()
+                ->with([
+                    'parking',
+                    'space',
+                    'vehicle',
+                    'payments',
+                    'services',
+                ])
+                ->latest()
+                ->get(),
+
+            'paymentMethods' => config('payments.methods'),
+            'yapeQrUrl' => $this->yapeQrUrl(),
+        ]);
+    }
+
+    private function yapeQrUrl(): ?string
+    {
+        $path = \App\Models\Parking::where(
+            'slug',
+            'estacionamiento-devioz'
+        )->value('yape_qr_path');
+
+        return $path
+            ? Storage::disk('public')->url($path)
+            : null;
+    }
+
+    public function create(Request $request): Response
+    {
+        $parking = \App\Models\Parking::query()
+            ->where('slug', 'estacionamiento-devioz')
+            ->firstOrFail();
+
+        return Inertia::render('Reservations/Create', [
+            'vehicles' => $request->user()
+                ->vehicles()
+                ->orderBy('plate')
+                ->get(),
+
+            'spaces' => $parking->spaces()
+                ->orderBy('floor')
+                ->orderBy('code')
+                ->get(),
+
+            'services' => Service::where('active', true)
+                ->orderBy('name')
+                ->get(),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'space_id' => [
+                'required',
+                'exists:spaces,id',
+            ],
+            'vehicle_id' => [
+                'required',
+                'exists:vehicles,id',
+            ],
+            'check_in_at' => [
+                'required',
+                'date',
+                'after_or_equal:now',
+            ],
+            'duration_hours' => [
+                'required',
+                'integer',
+                'between:1,12',
+            ],
+            'service_ids' => [
+                'array',
+            ],
+            'service_ids.*' => [
+                'integer',
+                'distinct',
+                'exists:services,id',
+            ],
+        ]);
+
+        $reservation = DB::transaction(
+            function () use ($data, $request): Reservation {
+                $space = Space::whereKey($data['space_id'])
+                    ->where('status', 'available')
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (
+                    ! $request->user()
+                        ->vehicles()
+                        ->whereKey($data['vehicle_id'])
+                        ->exists()
+                ) {
+                    abort(403);
+                }
+
+                $services = Service::whereIn(
+                    'id',
+                    $data['service_ids'] ?? []
+                )
+                    ->where('active', true)
+                    ->get();
+
+                $amount =
+                    ($data['duration_hours'] * 8)
+                    + (float) $services->sum('price');
+
+                $reservation = $request->user()
+                    ->reservations()
+                    ->create([
+                        'space_id' => $space->id,
+                        'parking_id' => $space->parking_id,
+                        'vehicle_id' => $data['vehicle_id'],
+                        'check_in_at' => $data['check_in_at'],
+                        'expected_duration_min' =>
+                            $data['duration_hours'] * 60,
+                        'status' => 'confirmed',
+                        'amount' => $amount,
+                        'currency' => 'PEN',
+                        'payment_status' => 'unpaid',
+                    ]);
+
+                $space->update([
+                    'status' => 'reserved',
+                    'current_reservation_id' =>
+                        $reservation->id,
+                ]);
+
+                $reservation->services()->attach(
+                    $services
+                        ->mapWithKeys(
+                            fn (Service $service): array => [
+                                $service->id => [
+                                    'price' => $service->price,
+                                ],
+                            ]
+                        )
+                        ->all()
+                );
+
+                return $reservation;
+            }
+        );
+
+        $reservation->load([
+            'space',
+            'vehicle',
+        ]);
+
+        AuditService::log(
+            request: $request,
+            module: 'Reservas',
+            action: 'Creada',
+            description:
+                "Reserva creada para la plaza {$reservation->space->code}.",
+            entity: $reservation,
+            reference: $reservation->space->code,
+            metadata: [
+                'reservation_id' => $reservation->id,
+                'space' => $reservation->space->code,
+                'vehicle_plate' =>
+                    $reservation->vehicle?->plate,
+                'status' => $reservation->status,
+                'payment_status' =>
+                    $reservation->payment_status,
+                'amount' => $reservation->amount,
+            ],
+        );
+
+        return to_route('reservations.index')->with(
+            'toast',
+            [
+                'type' => 'success',
+                'message' =>
+                    "Reserva confirmada por {$reservation->amount_formatted}.",
+            ]
+        );
+    }
+
+    public function extend(
+        Request $request,
+        Reservation $reservation
+    ): RedirectResponse {
+        $this->ensureOwner(
+            $request,
+            $reservation
+        );
+
+        abort_unless(
+            in_array(
+                $reservation->status,
+                ['confirmed', 'active'],
+                true
+            ),
+            422,
+            'Esta reserva ya no puede extenderse.'
+        );
+
+        $data = $request->validate([
+            'hours' => [
+                'required',
+                'integer',
+                'in:1,2,3',
+            ],
+        ]);
+
+        $additionalMinutes =
+            $data['hours'] * 60;
+
+        $additionalAmount =
+            $data['hours'] * 8;
+
+        DB::transaction(
+            function () use (
+                $reservation,
+                $additionalMinutes,
+                $additionalAmount
+            ): void {
+                $reservation->update([
+                    'expected_duration_min' =>
+                        $reservation->expected_duration_min
+                        + $additionalMinutes,
+
+                    'amount' =>
+                        (float) $reservation->amount
+                        + $additionalAmount,
+
+                    'payment_status' => 'unpaid',
+                ]);
+            }
+        );
+
+        $reservation->refresh();
+        $reservation->load([
+            'space',
+            'vehicle',
+        ]);
+
+        AuditService::log(
+            request: $request,
+            module: 'Reservas',
+            action: 'Extendida',
+            description:
+                "Reserva extendida {$data['hours']} hora(s) en la plaza {$reservation->space->code}.",
+            entity: $reservation,
+            reference: $reservation->space->code,
+            metadata: [
+                'reservation_id' => $reservation->id,
+                'space' => $reservation->space->code,
+                'vehicle_plate' =>
+                    $reservation->vehicle?->plate,
+                'hours_added' => $data['hours'],
+                'duration_minutes' =>
+                    $reservation->expected_duration_min,
+                'amount' => $reservation->amount,
+                'payment_status' =>
+                    $reservation->payment_status,
+            ],
+        );
+
+        return back()->with(
+            'toast',
+            [
+                'type' => 'success',
+                'message' =>
+                    "Reserva extendida {$data['hours']} hora(s). "
+                    ."Nuevo total: {$reservation->amount_formatted}.",
+            ]
+        );
+    }
+
+    public function checkin(
+        Request $request,
+        Reservation $reservation
+    ): RedirectResponse {
+        $this->ensureOwner(
+            $request,
+            $reservation
+        );
+
+        abort_unless(
+            $reservation->status === 'confirmed',
+            422,
+            'La reserva no está confirmada.'
+        );
+
+        DB::transaction(
+            function () use ($reservation): void {
+                $reservation->update([
+                    'status' => 'active',
+                    'check_in_at' => now(),
+                ]);
+
+                $reservation->space()->update([
+                    'status' => 'occupied',
+                    'current_reservation_id' =>
+                        $reservation->id,
+                ]);
+            }
+        );
+
+        $reservation->refresh();
+        $reservation->load([
+            'space',
+            'vehicle',
+        ]);
+
+        AuditService::log(
+            request: $request,
+            module: 'Reservas',
+            action: 'Ingreso',
+            description:
+                "Ingreso registrado en la plaza {$reservation->space->code}.",
+            entity: $reservation,
+            reference: $reservation->space->code,
+            metadata: [
+                'reservation_id' => $reservation->id,
+                'space' => $reservation->space->code,
+                'vehicle_plate' =>
+                    $reservation->vehicle?->plate,
+                'status' => $reservation->status,
+                'payment_status' =>
+                    $reservation->payment_status,
+            ],
+        );
+
+        return back()->with(
+            'toast',
+            [
+                'type' => 'success',
+                'message' => 'Ingreso registrado.',
+            ]
+        );
+    }
+
+    public function checkout(
+        Request $request,
+        Reservation $reservation
+    ): RedirectResponse {
+        $this->ensureOwner(
+            $request,
+            $reservation
+        );
+
+        abort_unless(
+            $reservation->status === 'active',
+            422,
+            'La reserva no está activa.'
+        );
+
+        $reservation->loadMissing([
+            'space',
+            'vehicle',
+        ]);
+
+        $spaceCode =
+            $reservation->space?->code;
+
+        $vehiclePlate =
+            $reservation->vehicle?->plate;
+
+        DB::transaction(
+            function () use ($reservation): void {
+                $reservation->update([
+                    'status' => 'completed',
+                    'check_out_at' => now(),
+                ]);
+
+                $reservation->space()->update([
+                    'status' => 'available',
+                    'current_reservation_id' => null,
+                ]);
+            }
+        );
+
+        $reservation->refresh();
+
+        AuditService::log(
+            request: $request,
+            module: 'Reservas',
+            action: 'Salida',
+            description:
+                "Salida registrada en la plaza {$spaceCode}.",
+            entity: $reservation,
+            reference: $spaceCode,
+            metadata: [
+                'reservation_id' => $reservation->id,
+                'space' => $spaceCode,
+                'vehicle_plate' =>
+                    $vehiclePlate,
+                'status' => $reservation->status,
+                'check_out_at' =>
+                    $reservation->check_out_at
+                        ?->toISOString(),
+            ],
+        );
+
+        return back()->with(
+            'toast',
+            [
+                'type' => 'success',
+                'message' => 'Check-out registrado.',
+            ]
+        );
+    }
+
+    public function cancel(
+        Request $request,
+        Reservation $reservation
+    ): RedirectResponse {
+        $this->ensureOwner(
+            $request,
+            $reservation
+        );
+
+        abort_unless(
+            in_array(
+                $reservation->status,
+                ['pending', 'confirmed'],
+                true
+            ),
+            422,
+            'La reserva no se puede cancelar.'
+        );
+
+        $reservation->loadMissing([
+            'space',
+            'vehicle',
+        ]);
+
+        $spaceCode =
+            $reservation->space?->code;
+
+        $vehiclePlate =
+            $reservation->vehicle?->plate;
+
+        DB::transaction(
+            function () use ($reservation): void {
+                $reservation->update([
+                    'status' => 'cancelled',
+                ]);
+
+                $reservation->space()->update([
+                    'status' => 'available',
+                    'current_reservation_id' => null,
+                ]);
+            }
+        );
+
+        $reservation->refresh();
+
+        AuditService::log(
+            request: $request,
+            module: 'Reservas',
+            action: 'Cancelada',
+            description:
+                "Reserva cancelada para la plaza {$spaceCode}.",
+            entity: $reservation,
+            reference: $spaceCode,
+            metadata: [
+                'reservation_id' => $reservation->id,
+                'space' => $spaceCode,
+                'vehicle_plate' =>
+                    $vehiclePlate,
+                'status' => $reservation->status,
+                'payment_status' =>
+                    $reservation->payment_status,
+            ],
+        );
+
+        return back()->with(
+            'toast',
+            [
+                'type' => 'success',
+                'message' => 'Reserva cancelada.',
+            ]
+        );
+    }
+
+    private function ensureOwner(
+        Request $request,
+        Reservation $reservation
+    ): void {
+        abort_unless(
+            $reservation->user_id ===
+                $request->user()->id,
+            403
+        );
+    }
+}

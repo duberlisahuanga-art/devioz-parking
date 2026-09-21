@@ -1,0 +1,122 @@
+<script setup lang="ts">
+import {
+    LayoutDashboard,
+    Calendar,
+    ParkingCircle,
+    Camera,
+    CreditCard,
+    Wrench,
+    Settings,
+    HelpCircle,
+} from '@lucide/vue';
+
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+} from '@/components/ui/sidebar';
+
+import NavMain from './NavMain.vue';
+import NavFooter from './NavFooter.vue';
+import NavUser from './NavUser.vue';
+
+interface NavItem {
+    title: string;
+    href: string;
+    icon?: any;
+    isActive?: boolean;
+    items?: {
+        title: string;
+        href: string;
+    }[];
+}
+
+const mainNavItems: NavItem[] = [
+    {
+        title: 'Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard,
+        isActive: true,
+    },
+    {
+        title: 'Reservas',
+        href: '/reservations',
+        icon: Calendar,
+        items: [
+            {
+                title: 'Nueva Reserva',
+                href: '/reservations/create',
+            },
+            {
+                title: 'Historial',
+                href: '/reservations',
+            },
+        ],
+    },
+    {
+        title: 'Espacios',
+        href: '/admin/spaces',
+        icon: ParkingCircle,
+    },
+    {
+        title: 'Cámaras',
+        href: '/admin/cameras',
+        icon: Camera,
+    },
+    {
+        title: 'Pagos',
+        href: '/admin/payments',
+        icon: CreditCard,
+    },
+    {
+        title: 'Servicios',
+        href: '/admin/services',
+        icon: Wrench,
+    },
+];
+
+const footerNavItems: NavItem[] = [
+    {
+        title: 'Configuración',
+        href: '/settings',
+        icon: Settings,
+    },
+    {
+        title: 'Ayuda',
+        href: '/help',
+        icon: HelpCircle,
+    },
+];
+</script>
+
+<template>
+    <Sidebar
+        class="bg-[#0d1527]/90 backdrop-blur-md border-r border-white/10"
+    >
+        <SidebarHeader class="border-b border-white/10 p-4">
+            <div class="flex items-center gap-3 group cursor-pointer">
+                <img
+                    src="/logo-devioz.png"
+                    alt="DEVIOZ PARKING"
+                    class="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+                />
+                <span class="font-bold text-lg text-[#eaf1fb]">
+                    DEVIOZ
+                </span>
+            </div>
+        </SidebarHeader>
+
+        <SidebarContent class="py-4">
+            <NavMain :items="mainNavItems" />
+        </SidebarContent>
+
+        <SidebarFooter class="border-t border-white/10 p-4">
+            <NavFooter :items="footerNavItems" />
+            <NavUser />
+        </SidebarFooter>
+
+        <slot />
+    </Sidebar>
+</template>
+
