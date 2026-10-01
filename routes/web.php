@@ -7,7 +7,6 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\VehicleController;
 use App\Models\Parking;
-use App\Models\Service;
 use App\Models\Space;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -19,7 +18,7 @@ Route::inertia('/', 'Welcome')
 Route::post(
     'demo/login/{role}',
     DemoLoginController::class
-)->name('demo.login');
+)->name('demo.login');  
 
 Route::middleware([
     'auth',
@@ -144,20 +143,6 @@ Route::middleware([
                                     'estacionamiento-devioz'
                                 )
                                 ->get(),
-
-                        'services' =>
-                            Service::where(
-                                'active',
-                                true
-                            )
-                                ->orderBy('name')
-                                ->get([
-                                    'id',
-                                    'name',
-                                    'description',
-                                    'price',
-                                    'duration_min',
-                                ]),
                     ],
                 ]
             );
@@ -178,7 +163,7 @@ Route::middleware([
         ]
     )->name('reservations.index');
 
-    Route::get(
+    Route::get( 
         'reservations/create',
         [
             ReservationController::class,
@@ -211,20 +196,28 @@ Route::middleware([
     )->name('reservations.checkout');
 
     Route::post(
-        'reservations/{reservation}/cancel',
-        [
-            ReservationController::class,
-            'cancel',
-        ]
-    )->name('reservations.cancel');
+    'reservations/{reservation}/request-cancellation',
+    [
+        ReservationController::class,
+        'requestCancellation',
+    ]
+)->name('reservations.request-cancellation');
 
-    Route::post(
-        'reservations/{reservation}/extend',
-        [
-            ReservationController::class,
-            'extend',
-        ]
-    )->name('reservations.extend');
+Route::post(
+    'reservations/{reservation}/approve-cancellation',
+    [
+        ReservationController::class,
+        'approveCancellation',
+    ]
+)->name('reservations.approve-cancellation');
+
+Route::post(
+    'reservations/{reservation}/reject-cancellation',
+    [
+        ReservationController::class,
+        'rejectCancellation',
+    ]
+)->name('reservations.reject-cancellation');
 
     Route::post(
         'reservations/{reservation}/payment',
@@ -239,31 +232,35 @@ Route::middleware([
     | Vehículos
     |--------------------------------------------------------------------------
     */
+/*
+|--------------------------------------------------------------------------
+| Vehículos
+|--------------------------------------------------------------------------
+*/
 
-    Route::get(
-        'vehicles',
-        [
-            VehicleController::class,
-            'index',
-        ]
-    )->name('vehicles.index');
+Route::get(
+    'vehicles',
+    [
+        VehicleController::class,
+        'index',
+    ]
+)->name('vehicles.index');
 
-    Route::post(
-        'vehicles',
-        [
-            VehicleController::class,
-            'store',
-        ]
-    )->name('vehicles.store');
+Route::post(
+    'vehicles',
+    [
+        VehicleController::class,
+        'store',
+    ]
+)->name('vehicles.store');
 
-    Route::delete(
-        'vehicles/{vehicle}',
-        [
-            VehicleController::class,
-            'destroy',
-        ]
-    )->name('vehicles.destroy');
-
+Route::delete(
+    'vehicles/{vehicle}',
+    [
+        VehicleController::class,
+        'destroy',
+    ]
+)->name('vehicles.destroy');
     /*
     |--------------------------------------------------------------------------
     | Administración
@@ -396,44 +393,6 @@ Route::middleware([
                     'cameras.recordings.destroy'
                 );
             });
-
-        /*
-        |--------------------------------------------------------------------------
-        | Servicios
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get(
-            'admin/services',
-            [
-                AdminController::class,
-                'services',
-            ]
-        )->name('admin.services');
-
-        Route::post(
-            'admin/services',
-            [
-                AdminController::class,
-                'storeService',
-            ]
-        )->name('admin.services.store');
-
-        Route::put(
-            'admin/services/{service}',
-            [
-                AdminController::class,
-                'updateService',
-            ]
-        )->name('admin.services.update');
-
-        Route::delete(
-            'admin/services/{service}',
-            [
-                AdminController::class,
-                'destroyService',
-            ]
-        )->name('admin.services.destroy');
     });
 });
 

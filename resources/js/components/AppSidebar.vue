@@ -6,7 +6,6 @@ import {
     ParkingCircle,
     Camera,
     CreditCard,
-    Wrench,
     Users,
     ClipboardList,
     Car,
@@ -107,11 +106,7 @@ const adminNavItems: NavItem[] = [
         href: '/admin/payments',
         icon: CreditCard,
     },
-    {
-        title: 'Servicios',
-        href: '/admin/services',
-        icon: Wrench,
-    },
+
     {
         title: 'Usuarios',
         href: '/admin/users',
@@ -192,47 +187,29 @@ const footerNavItems: NavItem[] = [
 </script>
 
 <template>
-    <Sidebar
-        collapsible="icon"
-        class="border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300"
-    >
+    <Sidebar collapsible="icon"
+        class="border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300">
         <!-- LOGO -->
-        <SidebarHeader
-            class="border-b border-sidebar-border px-3 py-4"
-        >
-            <div
-                class="flex items-center overflow-hidden"
-            >
+        <SidebarHeader class="border-b border-sidebar-border px-3 py-4">
+            <div class="flex items-center overflow-hidden">
                 <!-- Logo completo -->
-                <img
-                    src="/logo-devioz.png"
-                    alt="DEVIOZ"
-                    class="h-10 w-auto max-w-[160px] object-contain object-left transition-all duration-300 group-data-[collapsible=icon]:hidden"
-                />
+                <img src="/logo-devioz.png" alt="DEVIOZ"
+                    class="h-10 w-auto max-w-[160px] object-contain object-left transition-all duration-300 group-data-[collapsible=icon]:hidden" />
 
                 <!-- Logo compacto -->
-                <img
-                    src="/favicon.png"
-                    alt="DEVIOZ"
-                    class="hidden size-8 shrink-0 object-contain group-data-[collapsible=icon]:block"
-                />
+                <img src="/favicon.png" alt="DEVIOZ"
+                    class="hidden size-8 shrink-0 object-contain group-data-[collapsible=icon]:block" />
             </div>
         </SidebarHeader>
 
         <!-- MENÚ PRINCIPAL -->
         <SidebarContent class="py-4">
-            <NavMain
-                :items="mainNavItems"
-            />
+            <NavMain :items="mainNavItems" />
         </SidebarContent>
 
         <!-- PIE -->
-        <SidebarFooter
-            class="border-t border-sidebar-border p-3"
-        >
-            <NavFooter
-                :items="footerNavItems"
-            />
+        <SidebarFooter class="border-t border-sidebar-border p-3">
+            <NavFooter :items="footerNavItems" />
 
             <NavUser />
         </SidebarFooter>

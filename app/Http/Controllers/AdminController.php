@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Models\Parking;
 use App\Models\Payment;
 use App\Models\Reservation;
-use App\Models\Service;
 use App\Models\Space;
 use App\Models\User;
 use App\Services\AuditService;
@@ -32,7 +31,7 @@ class AdminController extends Controller
         return Inertia::render(
             'Admin/Overview',
             [
-                'metrics' => [
+                'metrics' => [  
                     'total_spaces' =>
                         $totalSpaces,
 
@@ -985,132 +984,5 @@ class AdminController extends Controller
                         ->get(),
             ]
         );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | SERVICIOS
-    |--------------------------------------------------------------------------
-    */
-
-    public function services(): Response
-    {
-        return Inertia::render(
-            'Admin/Services',
-            [
-                'services' =>
-                    Service::orderBy(
-                        'name'
-                    )->get(),
-            ]
-        );
-    }
-
-    public function storeService(
-        Request $request
-    ): RedirectResponse {
-        Service::create(
-            $this->validatedService(
-                $request
-            )
-        );
-
-        return back()->with(
-            'toast',
-            [
-                'type' =>
-                    'success',
-
-                'message' =>
-                    'Servicio creado.',
-            ]
-        );
-    }
-
-    public function updateService(
-        Request $request,
-        Service $service
-    ): RedirectResponse {
-        $service->update(
-            $this->validatedService(
-                $request
-            )
-        );
-
-        return back()->with(
-            'toast',
-            [
-                'type' =>
-                    'success',
-
-                'message' =>
-                    'Servicio actualizado.',
-            ]
-        );
-    }
-
-    public function destroyService(
-        Service $service
-    ): RedirectResponse {
-        abort_if(
-            $service
-                ->reservations()
-                ->exists(),
-            422,
-            'No puedes eliminar un servicio usado en reservas.'
-        );
-
-        $service->delete();
-
-        return back()->with(
-            'toast',
-            [
-                'type' =>
-                    'success',
-
-                'message' =>
-                    'Servicio eliminado.',
-            ]
-        );
-    }
-
-    private function validatedService(
-        Request $request
-    ): array {
-        return $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:120',
-            ],
-
-            'description' => [
-                'nullable',
-                'string',
-                'max:500',
-            ],
-
-            'price' => [
-                'required',
-                'numeric',
-                'min:0',
-            ],
-
-            'duration_min' => [
-                'required',
-                'integer',
-                'min:1',
-                'max:1440',
-            ],
-
-            'active' => [
-                'boolean',
-            ],
-        ]) + [
-            'active' =>
-                $request->boolean(
-                    'active'
-                ),
-        ];
     }
 }

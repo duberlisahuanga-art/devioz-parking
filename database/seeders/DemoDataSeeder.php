@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Camera;
 use App\Models\Parking;
 use App\Models\Reservation;
-use App\Models\Service;
 use App\Models\Space;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -206,36 +205,6 @@ class DemoDataSeeder extends Seeder
 
         /*
         |--------------------------------------------------------------------------
-        | SERVICIOS
-        |--------------------------------------------------------------------------
-        */
-
-        Service::updateOrCreate(
-            [
-                'name' => 'Lavado express',
-            ],
-            [
-                'description' => 'Lavado exterior rápido.',
-                'price' => 15,
-                'duration_min' => 30,
-                'active' => true,
-            ],
-        );
-
-        Service::updateOrCreate(
-            [
-                'name' => 'Lavado + encerado',
-            ],
-            [
-                'description' => 'Lavado completo con encerado.',
-                'price' => 25,
-                'duration_min' => 60,
-                'active' => true,
-            ],
-        );
-
-        /*
-        |--------------------------------------------------------------------------
         | CÁMARAS CCTV
         |--------------------------------------------------------------------------
         |
@@ -290,4 +259,3 @@ class DemoDataSeeder extends Seeder
         );
     }
 }  
-
